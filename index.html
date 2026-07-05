@@ -133,6 +133,35 @@ a{color:var(--pri-deep)}
 .fb .src{margin-top:10px;font-size:12.5px;color:var(--faint)}
 .offnote{margin-top:10px;font-size:13px;line-height:1.6;color:var(--muted);background:var(--pri-soft);border:1px solid var(--pri-soft2);border-radius:8px;padding:9px 12px}
 .offnote .ow{color:var(--warn);font-weight:600}
+/* 收藏／浮動按鈕／標記總覽 */
+.qmark{margin-left:auto;font-size:12.5px;font-weight:700;color:var(--pri-deep);border:1px solid var(--line2);border-radius:6px;padding:3px 10px;background:var(--card);white-space:nowrap}
+.qmark:hover{border-color:var(--pri)}
+.qmark.on{background:var(--flag-soft);border-color:#E3CE96;color:var(--flag)}
+.rhead .qmark{margin-left:auto}
+#fab{position:fixed;right:18px;bottom:18px;z-index:45;width:54px;height:54px;border-radius:50%;background:var(--pri);color:#fff;font-size:23px;border:none;box-shadow:0 4px 16px rgba(14,95,80,.42);display:flex;align-items:center;justify-content:center;transition:background .15s,transform .08s}
+#fab:hover{background:var(--pri-deep)}#fab:active{transform:scale(.94)}
+#fab .fabn{position:absolute;top:-3px;right:-3px;min-width:21px;height:21px;padding:0 5px;border-radius:11px;background:var(--flag);color:#fff;font-size:12px;font-weight:800;line-height:21px;display:none}
+#fab.has .fabn{display:block}
+.movl{position:fixed;inset:0;z-index:60;background:rgba(23,38,43,.5);display:flex;align-items:flex-start;justify-content:center;padding:24px 12px;overflow:auto}
+.movl[hidden]{display:none}
+.movl-box{background:var(--paper);border-radius:14px;max-width:760px;width:100%;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 12px 40px rgba(0,0,0,.32)}
+.movl-head{display:flex;align-items:center;gap:8px;padding:13px 18px;border-bottom:1px solid var(--line2);font-size:16px;flex:none}
+.movl-head .sp{flex:1}
+#movlBody{padding:14px 18px;overflow:auto}
+.mempty{text-align:center;color:var(--muted);padding:36px 14px;line-height:1.95;font-size:14px}
+.mtools{margin-bottom:10px}.mhint{font-size:12.5px;color:var(--faint)}
+.mlist{display:flex;flex-direction:column;gap:8px}
+.mrow{display:flex;align-items:stretch;gap:8px}
+.mrow-main{flex:1;min-width:0;display:flex;align-items:center;gap:10px;text-align:left;background:var(--card);border:1px solid var(--line);border-radius:9px;padding:9px 12px}
+.mrow-main:hover{border-color:var(--pri)}
+.mbadge{flex:none;font-size:11.5px;font-weight:700;color:var(--pri-deep);background:var(--pri-soft);border-radius:5px;padding:1px 8px}
+.mrow-topic{flex:none;font-size:12px;color:var(--muted);white-space:nowrap}
+.mrow-q{flex:1;min-width:0;font-size:13.5px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mrow-x{flex:none;width:36px;border:1px solid var(--line);border-radius:9px;background:var(--card);color:var(--muted);font-size:14px}
+.mrow-x:hover{border-color:var(--bad);color:var(--bad)}
+.backup{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh);padding:15px 18px;margin-top:20px}
+.backup h3{font-size:14px;margin-bottom:6px}.backup p{font-size:13px;color:var(--muted);line-height:1.7;margin:0 0 10px}
+.bkacts{display:flex;gap:8px;flex-wrap:wrap}
 .qnav{display:flex;gap:10px;margin-top:16px}
 .qnav .sp{flex:1}
 .sheet{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh);padding:14px 14px 16px;position:sticky;top:64px}
@@ -240,6 +269,105 @@ function shuffle(a){a=a.slice();for(var i=a.length-1;i>0;i--){var j=Math.floor(M
 function examById(id){for(var i=0;i<META.exams.length;i++)if(META.exams[i].id===id)return META.exams[i];return null}
 function bankOf(id){return (BANK&&BANK[id])||[]}
 function LETTER(i){return ['A','B','C','D'][i]}
+
+/* ---------- 我的標記：跨頁面收藏、永久保存於本機 ---------- */
+var K_MARK='fce.marks.v1';
+function getMarks(){return LS.get(K_MARK,[])}
+function markIdx(id){var m=getMarks();for(var i=0;i<m.length;i++)if(m[i].id===id)return i;return -1}
+function isMarked(id){return markIdx(id)>=0}
+function toggleMark(q){
+  var marks=getMarks(),i=markIdx(q.id);
+  if(i>=0)marks.splice(i,1);
+  else marks.push({id:q.id,exam:q.exam||(S&&S.examId)||'',topic:q.topic||'',subject:q.subject||'',q:q.q,opts:q.opts||q.options,ans:q.ans,exps:q.exps||q.explain,src:q.src||'',ts:Date.now()});
+  LS.set(K_MARK,marks);updateFab();return i<0;
+}
+function optRowsHtml(q){
+  var h='';
+  for(var j=0;j<4;j++){
+    var cls='ropt'+(j===q.ans?' ans':'');
+    h+='<div class="'+cls+'"><span class="k">'+LETTER(j)+'</span><div class="body">'+esc(q.opts[j])
+      +(j===q.ans?'<span class="tag t-ans">正確答案</span>':'')
+      +(q.exps&&q.exps[j]?'<span class="why">'+(j===q.ans?'✓ ':'✗ ')+esc(q.exps[j])+'</span>':'')
+      +'</div></div>';
+  }
+  if(isOff(q))h+=offNote(q);
+  if(q.src)h+='<div class="src">依據：'+esc(q.src)+'</div>';
+  return h;
+}
+function buildUI(){
+  var fab=document.createElement('button');
+  fab.id='fab';fab.setAttribute('data-act','openMarks');fab.title='我的標記題';
+  fab.innerHTML='⭐<span id="fabN" class="fabn"></span>';
+  document.body.appendChild(fab);
+  var ov=document.createElement('div');ov.id='movl';ov.className='movl';ov.hidden=true;
+  ov.innerHTML='<div class="movl-box"><div class="movl-head"><b>⭐ 我的標記題（<span id="mCnt">0</span>）</b><span class="sp"></span>'
+    +'<button class="btn btn-ghost btn-sm" data-act="mExport">匯出備份</button>'
+    +'<button class="btn btn-ghost btn-sm" data-act="mClose">關閉 ✕</button></div><div id="movlBody"></div></div>';
+  document.body.appendChild(ov);
+  var inp=document.createElement('input');inp.type='file';inp.id='impf';inp.accept='application/json,.json';inp.style.display='none';
+  inp.addEventListener('change',function(e){importData(e.target.files[0]);e.target.value=''});
+  document.body.appendChild(inp);
+  updateFab();
+}
+function updateFab(){
+  var n=getMarks().length,el=document.getElementById('fabN'),fab=document.getElementById('fab');
+  if(el)el.textContent=n?n:'';if(fab)fab.classList.toggle('has',n>0);
+}
+function openMarks(){renderMarkList();document.getElementById('movl').hidden=false}
+function closeMarks(){document.getElementById('movl').hidden=true}
+function renderMarkList(){
+  var marks=getMarks();document.getElementById('mCnt').textContent=marks.length;
+  var b=document.getElementById('movlBody'),h='';
+  if(!marks.length){
+    h='<div class="mempty">還沒有收藏任何題目。<br>作答或錯題檢討時，按題目上的「☆ 收藏」，題目就會存進這裡。<br>之後在<b>任何頁面</b>按右下角的 ⭐ 就能回來看，看完按「關閉」即回到原本的地方。</div>';
+  }else{
+    h='<div class="mtools"><span class="mhint">點題目展開詳解與正確答案；收藏永久保存在本機，可跨測驗回顧。</span></div><div class="mlist">';
+    marks.forEach(function(m,i){
+      var e=examById(m.exam);
+      h+='<div class="mrow"><button class="mrow-main" data-act="mView" data-i="'+i+'"><span class="mbadge">'+esc(e?e.short:m.exam)+'</span>'
+        +(m.topic?'<span class="mrow-topic">'+esc(m.topic)+'</span>':'')+'<span class="mrow-q">'+esc(m.q.slice(0,54))+(m.q.length>54?'…':'')+'</span></button>'
+        +'<button class="mrow-x" data-act="mUnmark" data-id="'+esc(m.id)+'" title="取消收藏">✕</button></div>';
+    });
+    h+='</div>';
+  }
+  b.innerHTML=h;
+}
+function showMarkDetail(i){
+  var m=getMarks()[i];if(!m)return;var e=examById(m.exam);
+  document.getElementById('movlBody').innerHTML='<button class="btn btn-ghost btn-sm" data-act="mBack">← 返回標記列表</button>'
+    +'<div class="rcard" style="margin-top:12px"><div class="rhead"><span class="mbadge">'+esc(e?e.short:m.exam)+'</span>'
+    +(m.subject?'<span class="qtag">'+esc(m.subject)+'</span>':'')+(m.topic?'<span class="qtag">'+esc(m.topic)+'</span>':'')
+    +'<span class="sp"></span><button class="btn btn-ghost btn-sm" data-act="mUnmark" data-id="'+esc(m.id)+'">取消收藏</button></div>'
+    +'<p class="qtext" style="font-size:15px">'+esc(m.q)+'</p>'+optRowsHtml(m)+'</div>';
+}
+function exportData(){
+  var data={app:'fce',v:1,ts:Date.now(),history:LS.get(K_HIS,[]),marks:getMarks()};
+  try{
+    var blob=new Blob([JSON.stringify(data)],{type:'application/json'});
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement('a');a.href=url;a.download='金融證照練習紀錄備份.json';
+    document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(url)},1500);
+  }catch(err){}
+  openModal('已匯出備份','已下載備份檔 <b>金融證照練習紀錄備份.json</b>（含測驗紀錄與收藏題）。<br><br>換裝置帶著走：把這個檔案傳到另一台裝置（LINE／Email／雲端硬碟皆可）→ 在該裝置開啟本網站 → 首頁按「匯入紀錄」選這個檔案即可。',
+    '<button class="btn btn-pri" data-act="modalClose">好</button>');
+}
+function importData(file){
+  if(!file)return;var r=new FileReader();
+  r.onload=function(){
+    try{
+      var d=JSON.parse(r.result);if(!d||d.app!=='fce')throw 0;
+      var his=LS.get(K_HIS,[]),marks=getMarks(),seenH={},seenM={};
+      his.forEach(function(x){seenH[x.ts]=1});
+      (d.history||[]).forEach(function(x){if(!seenH[x.ts]){his.push(x);seenH[x.ts]=1}});
+      his.sort(function(a,b){return b.ts-a.ts});
+      marks.forEach(function(x){seenM[x.id]=1});
+      (d.marks||[]).forEach(function(x){if(!seenM[x.id]){marks.push(x);seenM[x.id]=1}});
+      LS.set(K_HIS,his.slice(0,60));LS.set(K_MARK,marks);updateFab();
+      openModal('匯入完成','已合併還原你的<b>測驗紀錄</b>與<b>收藏題</b>。','<button class="btn btn-pri" data-act="afterImport">好</button>');
+    }catch(err){openModal('匯入失敗','檔案格式不正確，請選擇由本系統「匯出備份」產生的 .json 檔。','<button class="btn btn-ghost" data-act="modalClose">關閉</button>')}
+  };
+  r.readAsText(file);
+}
 
 /* ---------- 抽題：先依科目配額（如常識50+道德50），科目內依主題比例分層隨機 ---------- */
 function prepQ(q){
@@ -352,6 +480,7 @@ function vHome(){
     });
     h+='</table><div style="margin-top:8px"><button class="btn btn-ghost btn-sm" data-act="clearHis">清除紀錄</button></div></div>';
   }
+  h+='<div class="backup"><h3>📱 跨裝置與資料備份</h3><p>你的<b>測驗紀錄</b>與<b>收藏題</b>會自動存在<b>這台裝置的瀏覽器</b>裡（每台裝置各自獨立、彼此看不到別人的紀錄，不需登入）。換裝置想帶著走，用下面的備份：</p><div class="bkacts"><button class="btn btn-ghost btn-sm" data-act="doExport">⬇ 匯出紀錄（下載備份檔）</button><button class="btn btn-ghost btn-sm" data-act="doImport">⬆ 匯入紀錄（讀取備份檔）</button></div></div>';
   h+='<footer class="foot"><p><b>資料來源與聲明</b>：題庫含兩類——①<b>官方題庫與歷屆真題</b>（金融常識與職業道德＝證基會官方公開題庫 113 年版、永續＝2024–2026 官方試題、高業三科＝2021–2026 官方試題，均附官方標準答案，標示「官方題庫／真題·年份」）；②依官方命題範圍自編之<b>詳解練習題</b>（含逐選項解析）。考試制度依官方公告設定；早期年份試題若涉及已修正法規，一律以講義最新（2026）版本為準，實際規定請以主辦單位（證基會、金研院）最新公告為準。</p>';
   (META.sources||[]).forEach(function(s){h+='<p>・<a href="'+esc(s.url)+'" target="_blank" rel="noopener">'+esc(s.title)+'</a></p>'});
   h+='<p>製作：教學輔助用途（'+esc(META.updated||'')+'）</p></footer>';
@@ -405,6 +534,7 @@ function vExam(){
   h+='<div class="exam-wrap"><div>';
   h+='<div class="qcard"><div class="qhead"><span class="qno num">第 '+(S.idx+1)+' 題</span>'
     +(q.subject?'<span class="qtag">'+esc(q.subject)+'</span>':'')+'<span class="qtag">'+esc(q.topic)+'</span>'
+    +'<button class="qmark'+(isMarked(q.id)?' on':'')+'" data-act="mark">'+(isMarked(q.id)?'★ 已收藏':'☆ 收藏')+'</button>'
     +'<button class="qflag num '+(S.flags[S.idx]?'on':'')+'" data-act="flag">'+(S.flags[S.idx]?'已標記 ●':'標記待檢查')+'</button></div>'
     +'<p class="qtext">'+esc(q.q)+'</p><div class="opts">';
   var revealed=!mock&&S.revealed[S.idx];
@@ -505,7 +635,8 @@ function vReview(){
     var q=S.qs[i],picked=S.picked[i],ok=picked===q.ans;
     h+='<div class="rcard '+(ok?'correct-card':'wrong-card')+'"><div class="rhead"><span class="qno num" style="font-size:15px">第 '+(i+1)+' 題</span>'
       +'<span class="st '+(picked==null?'skip">未作答':(ok?'ok">答對':'bad">答錯'))+'</span>'
-      +(q.subject?'<span class="qtag">'+esc(q.subject)+'</span>':'')+'<span class="qtag">'+esc(q.topic)+'</span></div>'
+      +(q.subject?'<span class="qtag">'+esc(q.subject)+'</span>':'')+'<span class="qtag">'+esc(q.topic)+'</span>'
+      +'<button class="qmark'+(isMarked(q.id)?' on':'')+'" data-act="markRev" data-i="'+i+'">'+(isMarked(q.id)?'★ 已收藏':'☆ 收藏')+'</button></div>'
       +'<p class="qtext" style="font-size:15px">'+esc(q.q)+'</p>';
     for(var j=0;j<4;j++){
       var cls='ropt';if(j===q.ans)cls+=' ans';else if(picked===j)cls+=' pickw';
@@ -575,7 +706,18 @@ var ACT={
   resume:function(){var sv=LS.get(K_SES,null);if(!sv)return vHome();S=sv;
     if(S.mode==='mock'&&Date.now()>=S.deadline){submit(true)}else vExam()},
   abandon:function(){LS.del(K_SES);vHome()},
-  clearHis:function(){LS.del(K_HIS);vHome()}
+  clearHis:function(){LS.del(K_HIS);vHome()},
+  mark:function(d,t){var now=toggleMark(S.qs[S.idx]);if(t){t.classList.toggle('on',now);t.textContent=now?'★ 已收藏':'☆ 收藏'}},
+  markRev:function(d,t){var now=toggleMark(S.qs[+d.i]);if(t){t.classList.toggle('on',now);t.textContent=now?'★ 已收藏':'☆ 收藏'}},
+  openMarks:function(){openMarks()},
+  mClose:function(){closeMarks()},
+  mView:function(d){showMarkDetail(+d.i)},
+  mBack:function(){renderMarkList()},
+  mUnmark:function(d){var mk=getMarks(),i=markIdx(d.id);if(i>=0){mk.splice(i,1);LS.set(K_MARK,mk);updateFab()}renderMarkList()},
+  mExport:function(){exportData()},
+  doExport:function(){exportData()},
+  doImport:function(){var f=document.getElementById('impf');if(f)f.click()},
+  afterImport:function(){closeModal();vHome()}
 };
 document.addEventListener('click',function(e){
   var t=e.target.closest('[data-act]');if(!t||t.disabled)return;
@@ -583,6 +725,7 @@ document.addEventListener('click',function(e){
 });
 document.addEventListener('keydown',function(e){
   if(!S||S.done||document.getElementById('mask'))return;
+  var _ov=document.getElementById('movl');if(_ov&&!_ov.hidden)return;
   if(!document.querySelector('.exam-top'))return;
   var k=e.key;
   if(k>='1'&&k<='4')ACT.pick({i:String(+k-1)});
@@ -591,7 +734,7 @@ document.addEventListener('keydown',function(e){
   else if(k==='ArrowRight')ACT.next();
   else if(k==='f'||k==='F')ACT.flag();
 });
-vHome();
+buildUI();vHome();
 })();
 </script>
 

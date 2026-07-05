@@ -837,7 +837,14 @@ var ACT={
   doExport:function(){exportData()},
   doImport:function(){var f=document.getElementById('impf');if(f)f.click()},
   afterImport:function(){closeModal();vHome()},
-  login:function(){if(fbAuth)fbAuth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(function(e){openModal('登入失敗',esc((e&&e.message)||'請再試一次，或確認瀏覽器未封鎖彈出視窗。'),'<button class="btn btn-ghost" data-act="modalClose">關閉</button>')})},
+  login:function(){
+    if(!fbAuth)return;
+    fbAuth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(function(e){
+      var code=(e&&e.code)||'';
+      if(code==='auth/popup-closed-by-user'||code==='auth/cancelled-popup-request'||code==='auth/user-cancelled')return;
+      openModal('登入失敗',esc((e&&e.message)||'請再試一次，或確認瀏覽器未封鎖彈出視窗。'),'<button class="btn btn-ghost" data-act="modalClose">關閉</button>');
+    });
+  },
   logout:function(){if(fbAuth)fbAuth.signOut()},
   acctMenu:function(){var p=document.getElementById('acctpop');if(p)p.hidden=!p.hidden}
 };

@@ -140,10 +140,13 @@ a{color:var(--pri-deep)}
 .qmark.on{background:var(--pri-soft);border-color:var(--pri);color:var(--pri-deep)}
 .qflag{color:var(--flag)}.qflag:hover{border-color:var(--flag)}
 .qflag.on{background:var(--flag-soft);border-color:#E3CE96;color:var(--flag)}
-#fab{position:fixed;right:18px;bottom:18px;z-index:45;width:54px;height:54px;border-radius:50%;background:var(--pri);color:#fff;font-size:23px;border:none;box-shadow:0 4px 16px rgba(14,95,80,.42);display:flex;align-items:center;justify-content:center;transition:background .15s,transform .08s}
-#fab:hover{background:var(--pri-deep)}#fab:active{transform:scale(.94)}
-#fab .fabn{position:absolute;top:-3px;right:-3px;min-width:21px;height:21px;padding:0 5px;border-radius:11px;background:var(--flag);color:#fff;font-size:12px;font-weight:800;line-height:21px;display:none}
-#fab.has .fabn{display:block}
+#fabs{position:fixed;right:18px;bottom:18px;z-index:45;display:flex;flex-direction:column;gap:12px}
+.fab{position:relative;width:54px;height:54px;border-radius:50%;border:none;font-size:23px;box-shadow:0 4px 16px rgba(23,38,43,.3);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .15s,transform .08s}
+.fab:active{transform:scale(.94)}
+.fab-mark{background:var(--pri);color:#fff}.fab-mark:hover{background:var(--pri-deep)}
+.fab-flag{background:var(--flag);color:#fff}.fab-flag:hover{background:#8A6410}
+.fab .fabn{position:absolute;top:-4px;right:-4px;min-width:21px;height:21px;padding:0 5px;border-radius:11px;background:var(--ink);color:#fff;font-size:12px;font-weight:800;line-height:21px;display:none;border:2px solid var(--paper)}
+.fab.has .fabn{display:block}
 .movl{position:fixed;inset:0;z-index:60;background:rgba(23,38,43,.5);display:flex;align-items:flex-start;justify-content:center;padding:24px 12px;overflow:auto}
 .movl[hidden]{display:none}
 .movl-box{background:var(--paper);border-radius:14px;max-width:760px;width:100%;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 12px 40px rgba(0,0,0,.32)}
@@ -312,10 +315,10 @@ function optRowsHtml(q){
   return h;
 }
 function buildUI(){
-  var fab=document.createElement('button');
-  fab.id='fab';fab.setAttribute('data-act','openMarks');fab.title='我的標記題';
-  fab.innerHTML='⭐<span id="fabN" class="fabn"></span>';
-  document.body.appendChild(fab);
+  var box=document.createElement('div');box.id='fabs';
+  box.innerHTML='<button class="fab fab-flag" data-act="openFlags" title="標記（待檢查）">🚩<span id="fabFN" class="fabn"></span></button>'
+    +'<button class="fab fab-mark" data-act="openMarks" title="收藏（複習）">⭐<span id="fabMN" class="fabn"></span></button>';
+  document.body.appendChild(box);
   var ov=document.createElement('div');ov.id='movl';ov.className='movl';ov.hidden=true;
   ov.innerHTML='<div class="movl-box"><div class="movl-head"><b>我的題目</b><span class="sp"></span>'
     +'<button class="btn btn-ghost btn-sm" data-act="mExport">匯出備份</button>'
@@ -328,11 +331,14 @@ function buildUI(){
   updateFab();
 }
 function updateFab(){
-  var n=getMarks().length,el=document.getElementById('fabN'),fab=document.getElementById('fab');
-  if(el)el.textContent=n?n:'';if(fab)fab.classList.toggle('has',n>0);
+  var nm=getMarks().length,nf=curFlags().length;
+  var em=document.getElementById('fabMN'),ef=document.getElementById('fabFN');
+  if(em){em.textContent=nm?nm:'';em.parentNode.classList.toggle('has',nm>0)}
+  if(ef){ef.textContent=nf?nf:'';ef.parentNode.classList.toggle('has',nf>0)}
 }
 var _ovTab='marks';
 function openMarks(){_ovTab='marks';renderOverview();document.getElementById('movl').hidden=false}
+function openFlags(){_ovTab='flags';renderOverview();document.getElementById('movl').hidden=false}
 function closeMarks(){document.getElementById('movl').hidden=true}
 function curFlags(){var a=[];if(S&&S.qs)S.qs.forEach(function(q,i){if(S.flags[i])a.push({q:q,i:i})});return a}
 function renderOverview(){
@@ -480,7 +486,7 @@ function submit(auto){
 }
 
 /* ---------- 畫面 ---------- */
-function setHTML(h){app.innerHTML=h;window.scrollTo(0,0)}
+function setHTML(h){app.innerHTML=h;window.scrollTo(0,0);updateFab()}
 function hueCls(exam){return 'hue-'+(exam.hue||'gaoye')}
 
 function vHome(){
@@ -752,6 +758,7 @@ var ACT={
   mark:function(d,t){var now=toggleMark(S.qs[S.idx]);if(t){t.classList.toggle('on',now);t.textContent=now?'★ 已收藏':'☆ 收藏'}},
   markRev:function(d,t){var now=toggleMark(S.qs[+d.i]);if(t){t.classList.toggle('on',now);t.textContent=now?'★ 已收藏':'☆ 收藏'}},
   openMarks:function(){openMarks()},
+  openFlags:function(){openFlags()},
   mClose:function(){closeMarks()},
   mTab:function(d){_ovTab=d.t;renderOverview()},
   mJump:function(d){closeMarks();if(S&&S.qs&&!S.done){S.idx=+d.i;sheetOpen=false;save();vExam()}},

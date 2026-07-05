@@ -38,7 +38,7 @@ a{color:var(--pri-deep)}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 
 /* ============ 首頁 ============ */
-.brand{display:flex;align-items:center;gap:14px;padding:6px 0 18px;border-bottom:2px solid var(--ink);margin-bottom:22px}
+.brand{display:flex;align-items:center;gap:14px;padding:6px 94px 18px 0;border-bottom:2px solid var(--ink);margin-bottom:22px}
 .brand .seal{flex:none}
 .brand h1{font-size:24px;font-weight:800;letter-spacing:.04em}
 .brand .sub{color:var(--muted);font-size:13px;margin-top:2px}
@@ -182,10 +182,19 @@ a{color:var(--pri-deep)}
 .backup{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh);padding:15px 18px;margin-top:20px}
 .backup h3{font-size:14px;margin-bottom:6px}.backup p{font-size:13px;color:var(--muted);line-height:1.7;margin:0 0 10px}
 .bkacts{display:flex;gap:8px;flex-wrap:wrap}
-.acct{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
-.acct.in{background:var(--pri-soft);border:1px solid var(--pri-soft2);border-radius:8px;padding:8px 12px;font-size:13px}
-.acct .adot{width:8px;height:8px;border-radius:50%;background:var(--ok);flex:none}
-.ahint{font-size:12px;color:var(--faint)}
+#acct{position:fixed;top:12px;right:14px;z-index:46}
+#acct[hidden]{display:none}
+.gsi{display:inline-flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--line2);border-radius:22px;padding:7px 15px 7px 12px;font-size:13.5px;font-weight:600;color:var(--ink);box-shadow:0 1px 5px rgba(23,38,43,.12);cursor:pointer}
+.gsi:hover{background:#F7FAF8;border-color:var(--faint)}
+.gsi svg{display:block;flex:none}
+.ava{width:40px;height:40px;padding:0;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 6px rgba(23,38,43,.22);overflow:hidden;cursor:pointer;background:var(--pri);display:block}
+.ava img{width:100%;height:100%;object-fit:cover;display:block}
+.ava-l{color:#fff;font-weight:800;font-size:17px;display:flex;align-items:center;justify-content:center;width:100%;height:100%}
+.acctpop{position:absolute;top:48px;right:0;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 34px rgba(0,0,0,.2);padding:14px 16px;min-width:200px;text-align:center}
+.acctpop[hidden]{display:none}
+.ap-name{font-weight:700;font-size:14px}
+.ap-mail{font-size:12px;color:var(--muted);margin-top:2px;word-break:break-all}
+.ap-sync{font-size:12px;color:var(--ok);margin:9px 0 10px}
 .qnav{display:flex;gap:10px;margin-top:16px}
 .qnav .sp{flex:1}
 .sheet{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh);padding:14px 14px 16px;position:sticky;top:64px}
@@ -323,6 +332,7 @@ function buildUI(){
   box.innerHTML='<button class="fab fab-flag" data-act="openFlags" title="標記（待檢查）">🚩<span id="fabFN" class="fabn"></span></button>'
     +'<button class="fab fab-mark" data-act="openMarks" title="收藏（複習）">⭐<span id="fabMN" class="fabn"></span></button>';
   document.body.appendChild(box);
+  var ac=document.createElement('div');ac.id='acct';ac.hidden=true;document.body.appendChild(ac);
   var ov=document.createElement('div');ov.id='movl';ov.className='movl';ov.hidden=true;
   ov.innerHTML='<div class="movl-box"><div class="movl-head"><b id="movlTitle"></b><span class="sp"></span>'
     +'<button class="btn btn-ghost btn-sm" data-act="mExport">匯出備份</button>'
@@ -438,20 +448,27 @@ function initFirebase(){
     try{
       firebase.initializeApp(FB_CONFIG);
       fbAuth=firebase.auth();fbDb=firebase.firestore();fbReady=true;
-      fbAuth.onAuthStateChanged(function(u){fbUser=u;if(u)cloudPull();else refreshAcct()});
-      refreshAcct();
+      fbAuth.onAuthStateChanged(function(u){fbUser=u;if(u)cloudPull();else renderAcctWidget()});
+      renderAcctWidget();
     }catch(e){}
   });
 }
-function acctHtml(){
-  if(!fbReady)return '';
+var GOOGLE_G='<svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>';
+function renderAcctWidget(){
+  var a=document.getElementById('acct');if(!a)return;
+  if(!fbReady||document.querySelector('.exam-top')||document.querySelector('.rev-top')){a.hidden=true;a.innerHTML='';return}
+  a.hidden=false;
   if(fbUser){
-    var name=fbUser.displayName||fbUser.email||'已登入';
-    return '<div class="acct in"><span class="adot"></span>已用 Google 登入：<b>'+esc(name)+'</b>　雲端自動同步中　<button class="btn btn-ghost btn-sm" data-act="logout">登出</button></div>';
+    var photo=fbUser.photoURL,name=fbUser.displayName||fbUser.email||'帳號';
+    var av=photo?'<img src="'+esc(photo)+'" referrerpolicy="no-referrer" alt="">':'<span class="ava-l">'+esc((name.charAt(0)||'?').toUpperCase())+'</span>';
+    a.innerHTML='<button class="ava" data-act="acctMenu" title="'+esc(name)+'">'+av+'</button>'
+      +'<div class="acctpop" id="acctpop" hidden><div class="ap-name">'+esc(name)+'</div>'
+      +(fbUser.email&&fbUser.email!==name?'<div class="ap-mail">'+esc(fbUser.email)+'</div>':'')
+      +'<div class="ap-sync">☁️ 雲端同步中</div><button class="btn btn-ghost btn-sm" data-act="logout">登出</button></div>';
+  }else{
+    a.innerHTML='<button class="gsi" data-act="login">'+GOOGLE_G+'<span>登入</span></button>';
   }
-  return '<div class="acct"><button class="btn btn-pri btn-sm" data-act="login">用 Google 登入（跨裝置同步）</button><span class="ahint">登入後紀錄與收藏／標記綁定你的 Google 帳號，換裝置登入同一帳號即自動同步。</span></div>';
 }
-function refreshAcct(){var el=document.getElementById('acctArea');if(el)el.innerHTML=acctHtml()}
 function scheduleSync(){
   if(!fbReady||!fbUser||!fbDb)return;
   clearTimeout(_syncT);
@@ -466,9 +483,9 @@ function cloudPull(){
     var c=doc.exists?doc.data():{};
     var his=mergeBy('ts',LS.get(K_HIS,[]),c.history||[]);his.sort(function(p,q){return q.ts-p.ts});
     LS.set(K_HIS,his.slice(0,60));LS.set(K_MARK,mergeBy('id',getMarks(),c.marks||[]));
-    updateFab();scheduleSync();
-    if(document.querySelector('.brand'))vHome();else refreshAcct();
-  }).catch(function(){refreshAcct()});
+    updateFab();scheduleSync();renderAcctWidget();
+    if(document.querySelector('.brand'))vHome();
+  }).catch(function(){renderAcctWidget()});
 }
 
 /* ---------- 抽題：先依科目配額（如常識50+道德50），科目內依主題比例分層隨機 ---------- */
@@ -540,7 +557,7 @@ function submit(auto){
 }
 
 /* ---------- 畫面 ---------- */
-function setHTML(h){app.innerHTML=h;window.scrollTo(0,0);updateFab()}
+function setHTML(h){app.innerHTML=h;window.scrollTo(0,0);updateFab();renderAcctWidget()}
 function hueCls(exam){return 'hue-'+(exam.hue||'gaoye')}
 
 function vHome(){
@@ -582,7 +599,7 @@ function vHome(){
     });
     h+='</table><div style="margin-top:8px"><button class="btn btn-ghost btn-sm" data-act="clearHis">清除紀錄</button></div></div>';
   }
-  h+='<div class="backup"><h3>📱 跨裝置與帳號同步</h3><div id="acctArea">'+acctHtml()+'</div><p><b>登入</b>可跨裝置自動同步；<b>不登入</b>則紀錄存在這台裝置的瀏覽器（各裝置獨立、彼此看不到），也可用下面的備份檔手動搬移。</p><div class="bkacts"><button class="btn btn-ghost btn-sm" data-act="doExport">⬇ 匯出紀錄（下載備份檔）</button><button class="btn btn-ghost btn-sm" data-act="doImport">⬆ 匯入紀錄（讀取備份檔）</button></div></div>';
+  h+='<div class="backup"><h3>資料備份（跨裝置搬移）</h3><p>未登入時，紀錄存在這台裝置的瀏覽器（各裝置獨立、彼此看不到）。換裝置想手動搬移，可用備份檔：</p><div class="bkacts"><button class="btn btn-ghost btn-sm" data-act="doExport">⬇ 匯出紀錄（下載備份檔）</button><button class="btn btn-ghost btn-sm" data-act="doImport">⬆ 匯入紀錄（讀取備份檔）</button></div></div>';
   h+='<footer class="foot"><p><b>資料來源與聲明</b>：題庫含兩類——①<b>官方題庫與歷屆真題</b>（金融常識與職業道德＝證基會官方公開題庫 113 年版、永續＝2024–2026 官方試題、高業三科＝2021–2026 官方試題，均附官方標準答案，標示「官方題庫／真題 ─ 年份」）；②依官方命題範圍自編之<b>詳解練習題</b>（含逐選項解析）。考試制度依官方公告設定；早期年份試題若涉及已修正法規，一律以講義最新（2026）版本為準，實際規定請以主辦單位（證基會、金研院）最新公告為準。</p>';
   (META.sources||[]).forEach(function(s){h+='<p>─ <a href="'+esc(s.url)+'" target="_blank" rel="noopener">'+esc(s.title)+'</a></p>'});
   h+='<p>製作：教學輔助用途（'+esc(META.updated||'')+'）</p></footer>';
@@ -821,10 +838,14 @@ var ACT={
   doImport:function(){var f=document.getElementById('impf');if(f)f.click()},
   afterImport:function(){closeModal();vHome()},
   login:function(){if(fbAuth)fbAuth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(function(e){openModal('登入失敗',esc((e&&e.message)||'請再試一次，或確認瀏覽器未封鎖彈出視窗。'),'<button class="btn btn-ghost" data-act="modalClose">關閉</button>')})},
-  logout:function(){if(fbAuth)fbAuth.signOut()}
+  logout:function(){if(fbAuth)fbAuth.signOut()},
+  acctMenu:function(){var p=document.getElementById('acctpop');if(p)p.hidden=!p.hidden}
 };
 document.addEventListener('click',function(e){
-  var t=e.target.closest('[data-act]');if(!t||t.disabled)return;
+  var t=e.target.closest('[data-act]');
+  var pop=document.getElementById('acctpop');
+  if(pop&&!pop.hidden&&!e.target.closest('#acct'))pop.hidden=true;
+  if(!t||t.disabled)return;
   var fn=ACT[t.dataset.act];if(fn)fn(t.dataset,t,e);
 });
 document.addEventListener('keydown',function(e){

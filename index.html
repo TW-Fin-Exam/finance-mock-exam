@@ -182,6 +182,10 @@ a{color:var(--pri-deep)}
 .backup{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh);padding:15px 18px;margin-top:20px}
 .backup h3{font-size:14px;margin-bottom:6px}.backup p{font-size:13px;color:var(--muted);line-height:1.7;margin:0 0 10px}
 .bkacts{display:flex;gap:8px;flex-wrap:wrap}
+.acct{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.acct.in{background:var(--pri-soft);border:1px solid var(--pri-soft2);border-radius:8px;padding:8px 12px;font-size:13px}
+.acct .adot{width:8px;height:8px;border-radius:50%;background:var(--ok);flex:none}
+.ahint{font-size:12px;color:var(--faint)}
 .qnav{display:flex;gap:10px;margin-top:16px}
 .qnav .sp{flex:1}
 .sheet{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh);padding:14px 14px 16px;position:sticky;top:64px}
@@ -299,7 +303,7 @@ function toggleMark(q){
   var marks=getMarks(),i=markIdx(q.id);
   if(i>=0)marks.splice(i,1);
   else marks.push({id:q.id,exam:q.exam||(S&&S.examId)||'',topic:q.topic||'',subject:q.subject||'',q:q.q,opts:q.opts||q.options,ans:q.ans,exps:q.exps||q.explain,src:q.src||'',ts:Date.now()});
-  LS.set(K_MARK,marks);updateFab();return i<0;
+  LS.set(K_MARK,marks);updateFab();scheduleSync();return i<0;
 }
 function optRowsHtml(q){
   var h='';
@@ -328,7 +332,7 @@ function buildUI(){
   var inp=document.createElement('input');inp.type='file';inp.id='impf';inp.accept='application/json,.json';inp.style.display='none';
   inp.addEventListener('change',function(e){importData(e.target.files[0]);e.target.value=''});
   document.body.appendChild(inp);
-  updateFab();
+  updateFab();initFirebase();
 }
 function updateFab(){
   var nm=getMarks().length,nf=curFlags().length;
@@ -409,11 +413,62 @@ function importData(file){
       his.sort(function(a,b){return b.ts-a.ts});
       marks.forEach(function(x){seenM[x.id]=1});
       (d.marks||[]).forEach(function(x){if(!seenM[x.id]){marks.push(x);seenM[x.id]=1}});
-      LS.set(K_HIS,his.slice(0,60));LS.set(K_MARK,marks);updateFab();
+      LS.set(K_HIS,his.slice(0,60));LS.set(K_MARK,marks);updateFab();scheduleSync();
       openModal('匯入完成','已合併還原你的<b>測驗紀錄</b>與<b>收藏題</b>。','<button class="btn btn-pri" data-act="afterImport">好</button>');
     }catch(err){openModal('匯入失敗','檔案格式不正確，請選擇由本系統「匯出備份」產生的 .json 檔。','<button class="btn btn-ghost" data-act="modalClose">關閉</button>')}
   };
   r.readAsText(file);
+}
+
+/* ---------- Google 登入 + 雲端同步（Firebase，選用；離線或未載入時自動退回本機） ---------- */
+var FB_CONFIG={apiKey:"AIzaSyBp5gk5eIGOo5NpZa3yvV2pXO5rEkFXOlc",authDomain:"tw-fin-exam.firebaseapp.com",projectId:"tw-fin-exam",storageBucket:"tw-fin-exam.firebasestorage.app",messagingSenderId:"283806111856",appId:"1:283806111856:web:97d03ae4b3a51b53b77cb5"};
+var fbAuth=null,fbDb=null,fbUser=null,fbReady=false,_syncT=null;
+function loadFirebase(cb){
+  if(window.firebase&&window.firebase.auth)return cb();
+  var v='10.12.2',files=['firebase-app-compat.js','firebase-auth-compat.js','firebase-firestore-compat.js'],i=0;
+  (function next(){
+    if(i>=files.length)return cb();
+    var s=document.createElement('script');s.src='https://www.gstatic.com/firebasejs/'+v+'/'+files[i++];
+    s.onload=next;s.onerror=function(){cb(new Error('fb'))};document.head.appendChild(s);
+  })();
+}
+function initFirebase(){
+  loadFirebase(function(err){
+    if(err||!window.firebase)return;
+    try{
+      firebase.initializeApp(FB_CONFIG);
+      fbAuth=firebase.auth();fbDb=firebase.firestore();fbReady=true;
+      fbAuth.onAuthStateChanged(function(u){fbUser=u;if(u)cloudPull();else refreshAcct()});
+      refreshAcct();
+    }catch(e){}
+  });
+}
+function acctHtml(){
+  if(!fbReady)return '';
+  if(fbUser){
+    var name=fbUser.displayName||fbUser.email||'已登入';
+    return '<div class="acct in"><span class="adot"></span>已用 Google 登入：<b>'+esc(name)+'</b>　雲端自動同步中　<button class="btn btn-ghost btn-sm" data-act="logout">登出</button></div>';
+  }
+  return '<div class="acct"><button class="btn btn-pri btn-sm" data-act="login">用 Google 登入（跨裝置同步）</button><span class="ahint">登入後紀錄與收藏／標記綁定你的 Google 帳號，換裝置登入同一帳號即自動同步。</span></div>';
+}
+function refreshAcct(){var el=document.getElementById('acctArea');if(el)el.innerHTML=acctHtml()}
+function scheduleSync(){
+  if(!fbReady||!fbUser||!fbDb)return;
+  clearTimeout(_syncT);
+  _syncT=setTimeout(function(){
+    fbDb.collection('users').doc(fbUser.uid).set({history:LS.get(K_HIS,[]),marks:getMarks(),updatedAt:Date.now()}).catch(function(){});
+  },1500);
+}
+function mergeBy(key,a,b){var seen={},out=[];(a||[]).concat(b||[]).forEach(function(x){if(x&&x[key]!=null&&!seen[x[key]]){seen[x[key]]=1;out.push(x)}});return out}
+function cloudPull(){
+  if(!fbUser||!fbDb)return;
+  fbDb.collection('users').doc(fbUser.uid).get().then(function(doc){
+    var c=doc.exists?doc.data():{};
+    var his=mergeBy('ts',LS.get(K_HIS,[]),c.history||[]);his.sort(function(p,q){return q.ts-p.ts});
+    LS.set(K_HIS,his.slice(0,60));LS.set(K_MARK,mergeBy('id',getMarks(),c.marks||[]));
+    updateFab();scheduleSync();
+    if(document.querySelector('.brand'))vHome();else refreshAcct();
+  }).catch(function(){refreshAcct()});
 }
 
 /* ---------- 抽題：先依科目配額（如常識50+道德50），科目內依主題比例分層隨機 ---------- */
@@ -479,7 +534,7 @@ function submit(auto){
   var his=LS.get(K_HIS,[]);
   his.unshift({examId:S.examId,mode:S.mode,ts:Date.now(),score:g.score,correct:g.correct,total:S.total,
     pass:S.pass,usedSec:Math.round((Date.now()-S.startTs)/1000)});
-  LS.set(K_HIS,his.slice(0,60));
+  LS.set(K_HIS,his.slice(0,60));scheduleSync();
   if(auto){openModal('時間到','測驗時間已結束，系統已自動交卷。','<button class="btn btn-pri" data-act="toResults">查看成績</button>');}
   else vResults();
 }
@@ -527,7 +582,7 @@ function vHome(){
     });
     h+='</table><div style="margin-top:8px"><button class="btn btn-ghost btn-sm" data-act="clearHis">清除紀錄</button></div></div>';
   }
-  h+='<div class="backup"><h3>📱 跨裝置與資料備份</h3><p>你的<b>測驗紀錄</b>與<b>收藏題</b>會自動存在<b>這台裝置的瀏覽器</b>裡（每台裝置各自獨立、彼此看不到別人的紀錄，不需登入）。換裝置想帶著走，用下面的備份：</p><div class="bkacts"><button class="btn btn-ghost btn-sm" data-act="doExport">⬇ 匯出紀錄（下載備份檔）</button><button class="btn btn-ghost btn-sm" data-act="doImport">⬆ 匯入紀錄（讀取備份檔）</button></div></div>';
+  h+='<div class="backup"><h3>📱 跨裝置與帳號同步</h3><div id="acctArea">'+acctHtml()+'</div><p><b>登入</b>可跨裝置自動同步；<b>不登入</b>則紀錄存在這台裝置的瀏覽器（各裝置獨立、彼此看不到），也可用下面的備份檔手動搬移。</p><div class="bkacts"><button class="btn btn-ghost btn-sm" data-act="doExport">⬇ 匯出紀錄（下載備份檔）</button><button class="btn btn-ghost btn-sm" data-act="doImport">⬆ 匯入紀錄（讀取備份檔）</button></div></div>';
   h+='<footer class="foot"><p><b>資料來源與聲明</b>：題庫含兩類——①<b>官方題庫與歷屆真題</b>（金融常識與職業道德＝證基會官方公開題庫 113 年版、永續＝2024–2026 官方試題、高業三科＝2021–2026 官方試題，均附官方標準答案，標示「官方題庫／真題 ─ 年份」）；②依官方命題範圍自編之<b>詳解練習題</b>（含逐選項解析）。考試制度依官方公告設定；早期年份試題若涉及已修正法規，一律以講義最新（2026）版本為準，實際規定請以主辦單位（證基會、金研院）最新公告為準。</p>';
   (META.sources||[]).forEach(function(s){h+='<p>─ <a href="'+esc(s.url)+'" target="_blank" rel="noopener">'+esc(s.title)+'</a></p>'});
   h+='<p>製作：教學輔助用途（'+esc(META.updated||'')+'）</p></footer>';
@@ -753,18 +808,20 @@ var ACT={
   resume:function(){var sv=LS.get(K_SES,null);if(!sv)return vHome();S=sv;
     if(S.mode==='mock'&&Date.now()>=S.deadline){submit(true)}else vExam()},
   abandon:function(){LS.del(K_SES);vHome()},
-  clearHis:function(){LS.del(K_HIS);vHome()},
+  clearHis:function(){LS.del(K_HIS);scheduleSync();vHome()},
   mark:function(d,t){var now=toggleMark(S.qs[S.idx]);if(t){t.classList.toggle('on',now);t.textContent=now?'★ 已收藏':'☆ 收藏'}},
   markRev:function(d,t){var now=toggleMark(S.qs[+d.i]);if(t){t.classList.toggle('on',now);t.textContent=now?'★ 已收藏':'☆ 收藏'}},
   openMarks:function(){openMarks()},
   openFlags:function(){openFlags()},
   mClose:function(){closeMarks()},
   mJump:function(d){closeMarks();if(S&&S.qs&&!S.done){S.idx=+d.i;sheetOpen=false;save();vExam()}},
-  mUnmark:function(d){var mk=getMarks(),i=markIdx(d.id);if(i>=0){mk.splice(i,1);LS.set(K_MARK,mk);updateFab()}renderOverview()},
+  mUnmark:function(d){var mk=getMarks(),i=markIdx(d.id);if(i>=0){mk.splice(i,1);LS.set(K_MARK,mk);updateFab();scheduleSync()}renderOverview()},
   mExport:function(){exportData()},
   doExport:function(){exportData()},
   doImport:function(){var f=document.getElementById('impf');if(f)f.click()},
-  afterImport:function(){closeModal();vHome()}
+  afterImport:function(){closeModal();vHome()},
+  login:function(){if(fbAuth)fbAuth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(function(e){openModal('登入失敗',esc((e&&e.message)||'請再試一次，或確認瀏覽器未封鎖彈出視窗。'),'<button class="btn btn-ghost" data-act="modalClose">關閉</button>')})},
+  logout:function(){if(fbAuth)fbAuth.signOut()}
 };
 document.addEventListener('click',function(e){
   var t=e.target.closest('[data-act]');if(!t||t.disabled)return;
